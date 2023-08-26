@@ -1,0 +1,4 @@
+baseURL = 'https://mlashcorp.github.io/no_generals_problem/'
+languageCode = 'en-us'
+title = 'The No Generals Problem'
+theme = 'm10c'
