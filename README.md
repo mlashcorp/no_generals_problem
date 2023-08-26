@@ -1,2 +1,2 @@
 # no generals problem
-blog
+A blog about software engineering and distributed systems
