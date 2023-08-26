@@ -1,0 +1,3 @@
+User-agent: *
+Disallow:
+Sitemap: https://mlashcorp.github.io/no_generals_problem/sitemap.xml
