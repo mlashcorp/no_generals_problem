@@ -1,2 +1,2 @@
-# nogeneralsproblem
+# no generals problem
 blog
