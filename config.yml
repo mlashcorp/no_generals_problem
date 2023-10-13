@@ -11,6 +11,7 @@ buildExpired: false
 enableEmoji: true
 pygmentsUseClasses: true
 googleAnalytics: G-L8PPH1DLSB
+disqusShortname: no-generals-problem
 
 minify:
     disableXML: true
