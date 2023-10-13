@@ -10,7 +10,7 @@ buildFuture: false
 buildExpired: false
 enableEmoji: true
 pygmentsUseClasses: true
-# googleAnalytics: UA-123-45
+googleAnalytics: G-L8PPH1DLSB
 
 minify:
     disableXML: true
@@ -77,7 +77,7 @@ params:
     homeInfoParams:
         Title: "The No Generals Problem"
         Content: >
-            Welcome to my blog about software engineering and distributed systems.
+            Some thoughts about distributed systems.
 
     socialIcons:
         - name: github
