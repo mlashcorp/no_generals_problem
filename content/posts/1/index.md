@@ -37,6 +37,31 @@ To simplify the topic, I will start by dividing the problem into 3 options:
 
 3. Tensor Parallelism - in tensor parallelism we leverage the fact that matrix multiplication is problem that is trivially parallelizable. Each node maintains all layers of the network, but for each layer only a fraction of the parameters.In this configuration, we can process each layer in parallel in multiple nodes, both reducing the memory usage and the compute requirements in each node.
 
-There are other ways to distribute the computation of LLMs, but for now I will focus first on understanding tensor parallelism, specifically, the MegatronLM paper from Nvidia.
+There are other ways to distribute the computation of LLMs, but for now I will focus first on understanding tensor parallelism, specifically, the [MegatronLM paper from Nvidia](https://arxiv.org/abs/1909.08053).
 
 
+## Tensor Parallelism with MegatronLM
+
+One of the key ideas of the MegatronLM paper is that we can leverage the mathematical properties of the matrix dot product to distribute our computation. The paper focuses on applying their ideas to the transformer model. Specifically, we will be applying these ideas to the GPT-2 architecture which is a decoder-only transfomer. 
+
+To better understand the paper, I implemented some of its ideas using Andrej's GPT-2 nanoGPT implementation as a reference. The code can be found here, and I will reference it as I go through the paper.
+
+—
+
+Decoder transfomers are composed of several blocks of self-attention and fully connected layers. We will focus on section 3 of the paper where the authors provide an implementation both for the fully connected layer (MLP) and for the attention layer.
+
+![distributed inference](decoder.png)
+
+### Let's start with the MLP
+
+A multilayer perceptron is a kind of neural network. It is a fully connected network with a non-linear activation function. In GPT-2 this MLP has 2 linear layers with a GeLU non-linearity in between them. 
+
+```python
+def forward(self, x):
+_, T, _ = x.size() # batch size, sequence length, embedding dimensionality (n_embd)
+x = self.c_fc(x) # linear layer
+x = self.gelu(x) # activation
+x = self.c_proj(x) # linear layer
+```
+
+The key idea from the paper is that we can split the parameters of each linear layer in this MLP across nodes, but the way we split the parameters and the way we reconcile the results is worth explaining.
