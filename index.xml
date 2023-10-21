@@ -11,14 +11,16 @@
     </image>
     <generator>Hugo -- gohugo.io</generator>
     <language>en</language>
-    <lastBuildDate>Sat, 26 Aug 2023 16:31:22 +0100</lastBuildDate><atom:link href="https://mlashcorp.github.io/no_generals_problem/index.xml" rel="self" type="application/rss+xml" />
+    <lastBuildDate>Sat, 21 Oct 2023 16:31:22 +0100</lastBuildDate><atom:link href="https://mlashcorp.github.io/no_generals_problem/index.xml" rel="self" type="application/rss+xml" />
     <item>
-      <title>Nifex - Part 1</title>
+      <title>LLM Distributed Inference for Fun and not Profit - Part 1</title>
       <link>https://mlashcorp.github.io/no_generals_problem/posts/post-1/</link>
-      <pubDate>Sat, 26 Aug 2023 16:31:22 +0100</pubDate>
+      <pubDate>Sat, 21 Oct 2023 16:31:22 +0100</pubDate>
       
       <guid>https://mlashcorp.github.io/no_generals_problem/posts/post-1/</guid>
-      <description>Testing the Hugo static site generator &amp;hellip; nothing to see here</description>
+      <description>Recently, I got very interested in learning and understanding how LLMs work. Specifically, I was curious about how LLMs are used at scale (i.e., with multiple nodes).
+One of the best resources I found to learn about LLMs was Andrej Karpathy&amp;rsquo;s YouTube video, where he creates GPT-2 from scratch.
+(Also, if, like me, your fundamentals on neural networks are a bit rusty, he has a whole series where he builds up from the basic concepts of neural nets up to the transformer model).</description>
     </item>
     
   </channel>
