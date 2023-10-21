@@ -8,9 +8,10 @@ draft: false
 
 Recently, I got very interested in learning and understanding how LLMs work. Specifically, I was curious about how LLMs are used at scale (i.e., with multiple nodes). 
 
-One of the best resources I found to learn about LLMs was Andrej Karpathy's YouTube video, where he creates GPT-2 from scratch.
+One of the best resources I found to learn about LLMs was Andrej Karpathy's YouTube video, where he [creates GPT-2 from scratch](https://www.youtube.com/watch?v=kCc8FmEb1nY)
+.
 
-(Also, if, like me, your fundamentals on neural networks are a bit rusty, he has a whole series where he builds up from the basic concepts of neural nets up to the transformer model).
+(Also, if, like me, your fundamentals on neural networks are a bit rusty, he has a [whole series](https://karpathy.ai/zero-to-hero.html) where he builds up from the basic concepts of neural nets up to the transformer model).
 
 —
 
@@ -20,13 +21,13 @@ My intuition told me to start with the problem of distributing the forward pass 
 
 Most of the work I've seen focuses on Training parallelism - using multiple machines to accelerate the process of training the transformer model. However, training a neural network requires both forward and backward passes, so we should be able to leverage existing techniques used for training to our goal of distributing inference. 
 
-To me, it makes intuitive sense that most information about LLM parallelism is related to training. This is a non-interactive operation (not sensitive to latency) that is quite compute intensive. LLM Inference on the other hand is typically used in applications where the time to response is critical (such as chatGPT) - in a distributed setting, unless the problem we are tackling is embarrassingly parallelizable, we can expect the need to synchronize data between nodes, which will add latency to our application. 
+To me, it makes intuitive sense that most information about LLM parallelism is related to training. This is a non-interactive operation (not sensitive to latency) that is quite compute intensive. LLM Inference on the other hand is typically used in applications where the time to response is critical (such as chatGPT) - in a distributed setting, unless the problem we are tackling is [embarrassingly parallelizable](https://en.wikipedia.org/wiki/Embarrassingly_parallel), we can expect the need to synchronize data between nodes, which will add latency to our application. 
 
 In this blog series, I will explore existing algorithms to perform distributed inference for LLMs, their limitations and tradeoffs, and (try to) implement them from scratch to better understand them.
 
 ## How many ways can you split a matrix?
 
-Naturally, there already exists plenty of work dedicated to distribute the training of LLMs, and as I said, many of the concepts and techniques developed for parallel training should be applicable to inference as well. OpenAI provide a great starting point to understand some of the ways researchers in the field tackled this problem. 
+Naturally, there already exists plenty of work dedicated to distribute the training of LLMs, and as I said, many of the concepts and techniques developed for parallel training should be applicable to inference as well. OpenAI provide a [great starting point](https://openai.com/research/techniques-for-training-large-neural-networks) to understand some of the ways researchers in the field tackled this problem. 
 
 To simplify the topic, I will start by dividing the problem into 3 options:
 
