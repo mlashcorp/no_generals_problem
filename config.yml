@@ -125,11 +125,15 @@ markup:
             unsafe: true
     highlight:
         noClasses: false
-        # anchorLineNos: true
-        # codeFences: true
+        codeFences: true
         guessSyntax: true
-        # lineNos: true
         style: monokai
+        hl_Lines: ""
+        lineNoStart: 1
+        lineNos: true
+        lineNumbersInTable: true
+        tabWidth: 4
+        noClasses: false
 
 privacy:
     vimeo:
