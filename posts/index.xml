@@ -14,10 +14,10 @@
     <lastBuildDate>Sat, 21 Oct 2023 16:31:22 +0100</lastBuildDate><atom:link href="https://mlashcorp.github.io/no_generals_problem/posts/index.xml" rel="self" type="application/rss+xml" />
     <item>
       <title>LLM Distributed Inference for Fun and not Profit - Part 1</title>
-      <link>https://mlashcorp.github.io/no_generals_problem/posts/post-1/</link>
+      <link>https://mlashcorp.github.io/no_generals_problem/posts/1/</link>
       <pubDate>Sat, 21 Oct 2023 16:31:22 +0100</pubDate>
       
-      <guid>https://mlashcorp.github.io/no_generals_problem/posts/post-1/</guid>
+      <guid>https://mlashcorp.github.io/no_generals_problem/posts/1/</guid>
       <description>Recently, I got very interested in learning and understanding how LLMs work. Specifically, I was curious about how LLMs are used at scale (i.e., with multiple nodes).
 One of the best resources I found to learn about LLMs was Andrej Karpathy&amp;rsquo;s YouTube video, where he creates GPT-2 from scratch .
 Also, if, like me, your fundamentals on neural networks are a bit rusty, he has a whole series where he builds up from the basic concepts of neural nets up to the transformer model.</description>
