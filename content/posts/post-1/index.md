@@ -11,7 +11,7 @@ Recently, I got very interested in learning and understanding how LLMs work. Spe
 One of the best resources I found to learn about LLMs was Andrej Karpathy's YouTube video, where he [creates GPT-2 from scratch](https://www.youtube.com/watch?v=kCc8FmEb1nY)
 .
 
-(Also, if, like me, your fundamentals on neural networks are a bit rusty, he has a [whole series](https://karpathy.ai/zero-to-hero.html) where he builds up from the basic concepts of neural nets up to the transformer model).
+> Also, if, like me, your fundamentals on neural networks are a bit rusty, he has a [whole series](https://karpathy.ai/zero-to-hero.html) where he builds up from the basic concepts of neural nets up to the transformer model.
 
 —
 
