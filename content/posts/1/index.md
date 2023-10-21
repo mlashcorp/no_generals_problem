@@ -50,7 +50,7 @@ To better understand the paper, I implemented some of its ideas using Andrej's G
 
 Decoder transfomers are composed of several blocks of self-attention and fully connected layers. We will focus on section 3 of the paper where the authors provide an implementation both for the fully connected layer (MLP) and for the attention layer.
 
-![distributed inference](decoder.png#center)
+![decoder](decoder.png#center)
 
 ### Let's start with the MLP
 
@@ -65,3 +65,16 @@ def forward(self, x):
 ```
 
 The key idea from the paper is that we can split the parameters of each linear layer in this MLP across nodes, but the way we split the parameters and the way we reconcile the results is worth explaining.
+
+The following illustration shows a simple representation of a multiplication of an input 1x3 matrix by a 2x3 matrix, the result of which will be a 1x2 matrix.
+
+![gemm](gemm.png#center)
+
+In the transformer MLP, we can think of the blue matrix as the input for the MLP, and the 2x3 matrix (in yellow and red) as the parameters of the linear layer. 
+
+To calculate the result of the MLP, we need to [multiply the two matrices](https://en.wikipedia.org/wiki/Matrix_multiplication).
+
+This very simple example illustrates that we can split the 2x3 matrix across the two columns, send the full input matrix to 2 nodes, and independently (and in parallel) calculate each result element. Finally, to calculate the result of the multiplcation we must collect each result from the 2 nodes and concatenate them in the final 1x2 matrix.
+
+This same principle applies for very large matrices, which is what makes this idea useful for our application.
+
