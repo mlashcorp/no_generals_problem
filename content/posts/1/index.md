@@ -50,7 +50,7 @@ To better understand the paper, I implemented some of its ideas using Andrej's G
 
 Decoder transfomers are composed of several blocks of self-attention and fully connected layers. We will focus on section 3 of the paper where the authors provide an implementation both for the fully connected layer (MLP) and for the attention layer.
 
-![distributed inference](decoder.png)
+![distributed inference](decoder.png#center)
 
 ### Let's start with the MLP
 
