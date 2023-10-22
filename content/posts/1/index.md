@@ -68,7 +68,7 @@ The key idea from the paper is that we can split the parameters of each linear l
 
 The following illustration shows a simple representation of a multiplication of an input 1x3 matrix by a 2x3 matrix, the result of which will be a 1x2 matrix.
 
-![gemm](gemm.png#center)
+![gemm](gemm-1.png#center)
 
 In the transformer MLP, we can think of the blue matrix as the input for the MLP, and the 2x3 matrix (in yellow and red) as the parameters of the linear layer. 
 
