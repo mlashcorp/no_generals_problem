@@ -66,15 +66,31 @@ def forward(self, x):
 
 The key idea from the paper is that we can split the parameters of each linear layer in this MLP across nodes, but the way we split the parameters and the way we reconcile the results is worth explaining.
 
-The following illustration shows a simple representation of a multiplication of an input 1x3 matrix by a 2x3 matrix, the result of which will be a 1x2 matrix.
+The following illustration shows a simple representation of a multiplication of an input 1x2 matrix by a 2x2 matrix, the result of which will be a 1x2 matrix.
+
 
 ![gemm](gemm-1.png#center)
 
-In the transformer MLP, we can think of the blue matrix as the input for the MLP, and the 2x3 matrix (in yellow and red) as the parameters of the linear layer. 
+
+In the transformer MLP, we can think of the blue matrix as the input for the MLP, and the 2x2 matrix (in yellow and red) as the parameters of the linear layer. The number of inputs to the MLP must match the number of columns in our input (n_embed). The number of columns represents the hidden dimension of the linear layer. The GPT-2 paper actually uses 4 * n_embed, but simplicity sake I'll keep it n_embed by n_embed.
 
 To calculate the result of the MLP, we need to [multiply the two matrices](https://en.wikipedia.org/wiki/Matrix_multiplication).
 
-This very simple example illustrates that we can split the 2x3 matrix across the two columns, send the full input matrix to 2 nodes, and independently (and in parallel) calculate each result element. Finally, to calculate the result of the multiplcation we must collect each result from the 2 nodes and concatenate them in the final 1x2 matrix.
+This very simple example illustrates that we can split the 2x2 matrix across the two columns, send the full input matrix to 2 nodes, and independently (and in parallel) calculate each result element. 
 
-This same principle applies for very large matrices, which is what makes this idea useful for our application.
+> This same principle applies for very large matrices, which is what makes this idea useful for our application.
+
+Figure 3a of the paper shows how data must be split for the MLP block. The authors opted to split the linear layer weights along the columns:
+
+[Y1, Y2] = [GeLU(X A1), GeLU(X A2)]
+
+Where A is the linear layer, and A1 has the first half of the columns of the matrix, and A2 the second half. As we saw before, we can independently calculate the resulting Y matrix in different nodes.
+
+For the second linear layer, we must partition its parameter matrix along its rows (matrices B1 and B2) so that matrix multiplication rules are preserved. 
+
+![gemm](gemm-2.png#center)
+
+After applying the non-linearity, each node will have a resulting 1x2 matrix that contains the result in the correct format, but take both matrices from the 2 nodes and add them to get the final result.
+
+
 
