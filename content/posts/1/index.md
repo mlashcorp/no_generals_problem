@@ -172,6 +172,31 @@ Here I'm loading a slice of the first linear layer of the MLP block by loading o
             return (partition_start, partition_end)
 ```
 
+Then, in the MLP definition, I change the shape of the linear layers to match the way we are loading the model. If we recall the paper, we must partition the first linear layer across its columns, and the second across its rows (by dividing by config.number_of_workers):
 
+```py
+    self.c_fc = nn.Linear(config.n_embd, (4 * config.n_embd) //
+                            config.number_of_workers, bias=config.bias)
+    self.gelu = nn.GELU()
+    self.c_proj = nn.Linear(
+        (4 * config.n_embd) // config.number_of_workers, config.n_embd, bias=config.bias)
+```
 
+Finally, in the forward pass, we must sum the result of this operation across all nodes by using the (simulated) all_reduce operation:
 
+```py
+    def forward(self, x):
+        _, T, _ = x.size()  # batch size, sequence length, embedding dimensionality (n_embd)
+        x = self.c_fc(x)    # linear layer
+        x = self.gelu(x)    # activation
+        x = self.c_proj(x)  # linear layer
+
+        # All reduce the output of the MLP. (Synchronization point)
+        op_id = f"{self.layer_id}_{T}"
+        x = self.reduce_controller.all_reduce(op_id, x)
+
+        x = self.dropout(x)
+        return x
+```
+
+The same idea is applied to the self-attention block, and I invite you to read the code and try it out. That's all for today, next I will finish implementing the paper by distributing the embeddings, and use Torch's all_reduce and run the code in different nodes. See you then!
