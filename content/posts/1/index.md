@@ -2,6 +2,7 @@
 title: "LLM Distributed Inference for Fun and not Profit - Part 1"
 date: 2023-10-21T16:31:22+01:00
 draft: false
+math: katex
 ---
 
 ![distributed inference](ngp_1.jpeg)
@@ -82,7 +83,9 @@ This very simple example illustrates that we can split the 2x2 matrix across the
 
 Figure 3a of the paper shows how data must be split for the MLP block. The authors opted to split the linear layer weights along the columns:
 
-[Y1, Y2] = [GeLU(X A1), GeLU(X A2)]
+\f\relax{x} = \int_{-\infty}^\infty
+    \f\hat\xi\,e^{2 \pi i \xi x}
+    \,d\xi
 
 Where A is the linear layer, and A1 has the first half of the columns of the matrix, and A2 the second half. As we saw before, we can independently calculate the resulting Y matrix in different nodes.
 
