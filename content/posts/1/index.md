@@ -60,7 +60,7 @@ Decoder transformers are composed of several blocks of self-attention and fully 
 
 A multilayer perceptron is a kind of neural network. It is a fully connected network with a non-linear activation function. In GPT-2, this MLP has 2 linear layers with a GeLU non-linearity in between them. 
 
-```
+```py
 def forward(self, x):
     _, T, _ = x.size() 
     x = self.c_fc(x)   # linear layer
@@ -200,5 +200,6 @@ Finally, in the forward pass, we must sum the result of this operation across al
 ```
 
 The same idea is applied to the self-attention block, and I invite you to read the code and try it out. 
+
 
 That's all for today, next I will finish implementing the paper by distributing the embeddings, and use Torch's all_reduce and run the code in different nodes. See you then!
