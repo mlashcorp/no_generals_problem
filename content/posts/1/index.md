@@ -56,7 +56,7 @@ Decoder transformers are composed of several blocks of self-attention and fully 
 
 ![decoder](decoder.png#center)
 
-### Let's start with the MLP
+### Parallelizing the MLP
 
 A multilayer perceptron is a kind of neural network. It is a fully connected network with a non-linear activation function. In GPT-2, this MLP has 2 linear layers with a GeLU non-linearity in between them. 
 
@@ -104,6 +104,35 @@ For the second linear layer, we must partition its parameter matrix along its ro
 ![gemm](gemm-2.png#center)
 
 After applying the non-linearity, each node will have a resulting 1x2 matrix (lime green and brown in node 1, dark red and magenta in node 2) that contains the result in the correct format, but to calculate the final result of the MLP block, we must take both matrices from the 2 nodes and add them (using an [all_reduce operation](https://pytorch.org/docs/stable/distributed.html#torch.distributed.all_reduce)) to get the final result.
+
+This is the key strategy that the authors also use in the self-attention block. I won't go into details of that here, but will briefly mention it as we go through the code.
+
+## Adapting NanoGPT to run in parallel
+
+To apply the ideas discussed in the previous section, I adapted the [NanoGPT implementation](https://github.com/karpathy/nanoGPT) so that the MLP and the self-attention blocks can be split across several nodes. My goal was to create a minimally viable implementation, that favors readibility against completeness or sophistication. As an example, for this first PoC, I'm not using Torch's all_reduce operation, but rather simulating it using Python's [BaseManager process](https://docs.python.org/3/library/multiprocessing.html#multiprocessing.managers.BaseManager). The idea here is that we launch several processes, and they all publish their intermediate results to the base manager, and only when all have submited their results, they all get the final, reduced version of the matrix:
+
+```py
+def all_reduce(self, op_id: str, tensor: torch.Tensor):
+    with self.cv:
+        if op_id not in self.state:
+            self.state[op_id] = (tensor, 1)
+        else:
+            state_tensor, count = self.state[op_id]
+            self.state[op_id] = (
+                torch.add(state_tensor, tensor), count + 1)
+
+        if self.state[op_id][1] < self.number_of_workers:
+            self.cv.wait()
+        else:
+            self.cv.notify_all()
+        return self.state[op_id][0]
+```
+
+For each operation (uniquely identified using the op_id - using the worker index, the block name, and the current token index) we sum the input matrix with the existing state, and block the caller on a condition variable. When the final worker calls the all_reduce function, we notify all blocked users and return the final matrix.
+
+> The points where we use all reduce are the synchronization points between machines. The amount of data we need to transfer and the inter-node latency will be the bottlenecks for the forward pass performance.
+
+
 
 
 
