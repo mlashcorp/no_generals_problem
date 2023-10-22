@@ -122,7 +122,7 @@ The entire GPT-2 implementation is still contained in a single file, distributed
 └── download_model.py          <- Use this to download the GPT-2 124M model from HF
 ```
 
-As an example, for this first PoC, I'm not using Torch's all_reduce operation, but rather simulating it using Python's [BaseManager process](https://docs.python.org/3/library/multiprocessing.html#multiprocessing.managers.BaseManager). The idea here is that we launch several processes, and they all publish their intermediate results to the base manager, and only when all have submited their results, they all get the final, reduced version of the matrix:
+A key simplification done in this codebase was the introduction of a distributed state module. This module implements a naive all_reduce operation, using Python's [BaseManager process](https://docs.python.org/3/library/multiprocessing.html#multiprocessing.managers.BaseManager) as a synchronization point between processes. When you run this code using multiple processes, each time a worker calls the all_reduce function, it will publish their intermediate results to the base manager, and only when all workers have submited their results, they all get the final, reduced version of the matrix:
 
 ```py
 def all_reduce(self, op_id: str, tensor: torch.Tensor):
@@ -147,7 +147,7 @@ For each operation (uniquely identified using the op_id - using the worker index
 
 This first version of the code does not address all aspects presented in the paper. I simply focused on implementing the distributed MLP and self-attention blocks. Other aspects such as word, position and transposed embeddings were not distributed yet.
 
-There are 2 key areas worth exploring in this code. 1) how I'm loading the model shard in each node; and 2) how I'm setting the MLP and Self-Attention parameter sizes. Let's look at model loading first.
+There are two key areas worth exploring in this code. 1) how I'm loading the model shard in each node; and 2) how I'm setting the MLP and Self-Attention parameter sizes. Let's look at model loading first.
 
 ### Sharded model loading
 
