@@ -109,7 +109,20 @@ This is the key strategy that the authors also use in the self-attention block. 
 
 ## Adapting NanoGPT to run in parallel
 
-To apply the ideas discussed in the previous section, I adapted the [NanoGPT implementation](https://github.com/karpathy/nanoGPT) so that the MLP and the self-attention blocks can be split across several nodes. My goal was to create a minimally viable implementation, that favors readibility against completeness or sophistication. As an example, for this first PoC, I'm not using Torch's all_reduce operation, but rather simulating it using Python's [BaseManager process](https://docs.python.org/3/library/multiprocessing.html#multiprocessing.managers.BaseManager). The idea here is that we launch several processes, and they all publish their intermediate results to the base manager, and only when all have submited their results, they all get the final, reduced version of the matrix:
+To apply the ideas discussed in the previous section, I adapted the [NanoGPT implementation](https://github.com/karpathy/nanoGPT) so that the MLP and the self-attention blocks can be split across several nodes. My goal was to create a minimally viable implementation, that favors readibility against completeness or sophistication. 
+
+The entire GPT-2 implementation is still contained in a single file, distributed_model.py. The relevant files from the repo are:
+
+```
+.
+├── run.py                     <- CLI application wrapper
+├── distributed_inference.py   <- Launches the processes and waits for the results.
+├── distributed_model.py       <- GPT-2 with tensor parallelism
+├── distributed_state.py       <- Simulated distributed all reduce
+└── download_model.py          <- Use this to download the GPT-2 124M model from HF
+```
+
+As an example, for this first PoC, I'm not using Torch's all_reduce operation, but rather simulating it using Python's [BaseManager process](https://docs.python.org/3/library/multiprocessing.html#multiprocessing.managers.BaseManager). The idea here is that we launch several processes, and they all publish their intermediate results to the base manager, and only when all have submited their results, they all get the final, reduced version of the matrix:
 
 ```py
 def all_reduce(self, op_id: str, tensor: torch.Tensor):
@@ -132,6 +145,32 @@ For each operation (uniquely identified using the op_id - using the worker index
 
 > The points where we use all reduce are the synchronization points between machines. The amount of data we need to transfer and the inter-node latency will be the bottlenecks for the forward pass performance.
 
+This first version of the code does not address all aspects presented in the paper. I simply focused on implementing the distributed MLP and self-attention blocks. Other aspects such as word, position and transposed embeddings were not distributed yet.
+
+There are 2 key areas worth exploring in this code. 1) how I'm loading the model shard in each node; and 2) how I'm setting the MLP and Self-Attention parameter sizes. Let's look at model loading first.
+
+### Sharded model loading
+
+Model loading is done in the load_layers function of the distributed_mode.py module. I leverage safetensors to load a slice of each layer selectively. As an example:
+
+```py
+if "mlp.c_fc.weight" in layer:
+    # Partition by column. This will convert the slice to a Tensor object
+    tensor_slice = f.get_slice(layer)
+    tensors[layer] = tensor_slice[:, mlp_start_idx:mlp_end_idx]
+```
+Here I'm loading a slice of the first linear layer of the MLP block by loading only the columns allocated to this worker node. Start and end indeces for the columns are calculated using this helper function:
+
+```py
+        def get_worker_partition(C: int = 768,
+                                 worker_index: int = 0,
+                                 number_of_workers: int = 1):
+            partition_size = C // number_of_workers
+            # Calculate the "chunk" that this node will process
+            partition_start = worker_index * partition_size
+            partition_end = partition_start + partition_size
+            return (partition_start, partition_end)
+```
 
 
 
