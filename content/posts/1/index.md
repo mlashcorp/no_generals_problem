@@ -83,9 +83,7 @@ This very simple example illustrates that we can split the 2x2 matrix across the
 
 Figure 3a of the paper shows how data must be split for the MLP block. The authors opted to split the linear layer weights along the columns:
 
-\f\relax{x} = \int_{-\infty}^\infty
-    \f\hat\xi\,e^{2 \pi i \xi x}
-    \,d\xi
+$$ [Y1, Y2] = [GeLU(X A1), GeLU(X A2)] $$
 
 Where A is the linear layer, and A1 has the first half of the columns of the matrix, and A2 the second half. As we saw before, we can independently calculate the resulting Y matrix in different nodes.
 
