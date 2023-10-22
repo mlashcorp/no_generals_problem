@@ -7,7 +7,7 @@ math: katex
 
 ![distributed inference](ngp_1.jpeg)
 
-Recently, I got very interested in learning and understanding how LLMs work. Specifically, I was curious about how LLMs are used at scale (i.e., with multiple nodes). 
+Recently, I became very interested in learning and understanding how LLMs work. Specifically, I was curious about how LLMs are used at scale (i.e., with multiple nodes). 
 
 One of the best resources I found to learn about LLMs was Andrej Karpathy's YouTube video, where he [created GPT-2 from scratch](https://www.youtube.com/watch?v=kCc8FmEb1nY)
 .
@@ -20,9 +20,9 @@ Having learned the basics of how a Transformer model works, it was time to dive 
 
 My intuition told me to start with the problem of distributing the forward pass (inference, in which we provide input to an LLM and get generated text as a result), if nothing else, because it felt like an easier problem to tackle compared to distributed training.
 
-Most of the work I've seen focuses on Training parallelism - using multiple machines to accelerate the process of training the transformer model. However, training a neural network requires both forward and backward passes, so we should be able to leverage existing techniques used for training to our goal of distributing inference. 
+Most of the work I've seen focuses on Training parallelism - using multiple machines to accelerate the process of training the transformer model. However, training a neural network requires both forward and backward passes, so we should be able to leverage existing techniques used for training for my goal of distributing inference. 
 
-To me, it makes intuitive sense that most information about LLM parallelism is related to training. This is a non-interactive operation (not sensitive to latency) that is quite compute-intensive. LLM Inference, on the other hand, is typically used in applications where the time to response is critical (such as chatGPT) - in a distributed setting, unless the problem we are tackling is [embarrassingly parallelizable](https://en.wikipedia.org/wiki/Embarrassingly_parallel), we can expect the need to synchronize data between nodes, which will add latency to our application. However, I believe there are still several applications that would benefit from distributing inference at the cost of latency (such as batch operations that require LLM capabilities), and I'm also keen to explore how fast I can perform inference using multiple nodes.
+To me, it makes intuitive sense that most information about LLM parallelism is related to training. This is a non-interactive operation (not sensitive to latency) that is quite compute-intensive. LLM inference, on the other hand, is typically used in applications where the time to response is critical (such as chatGPT). In a distributed setting, unless the problem we are tackling is [embarrassingly parallelizable](https://en.wikipedia.org/wiki/Embarrassingly_parallel), we can expect that the need to synchronize data between nodes will add latency to our application. However, I believe there are still several applications that would benefit from distributing inference at the cost of latency (such as batch operations that require LLM capabilities), and I'm also keen to explore how fast inference can be performed using multiple nodes.
 
 In this blog series, I will explore existing algorithms to perform distributed inference for LLMs, their limitations and tradeoffs, and (try to) implement them from scratch to understand them better.
 
@@ -30,15 +30,15 @@ In this blog series, I will explore existing algorithms to perform distributed i
 
 Naturally, there already exists plenty of work dedicated to distributing the training of LLMs, and as I said, many of the concepts and techniques developed for parallel training should be applicable to inference as well. OpenAI provides a [great starting point](https://openai.com/research/techniques-for-training-large-neural-networks) to understand how researchers in the field have tackled this problem. 
 
-There are several techniques to perform parallel training of LLMs, but for the sake of simplicity, I will start by dividing the problem into 3 options:
+There are several techniques to perform parallel training of LLMs, but for the sake of simplicity, I will start by considering three popular options:
 
-1. Data Parallelism - where we load the entire model in each node but only pass part of the training data. Gradients are then averaged across workers. This option is not applicable for inference since LLMs are [auto-regressive](https://www.investopedia.com/terms/a/autoregressive.asp#:~:text=A%20statistical%20model%20is%20autoregressive,based%20on%20its%20past%20performance.) and, as such, require previously generated tokens to predict a given token.
+1. Data Parallelism - where we load the entire model in each node but only give each node a part of the training data. Gradients are then averaged across workers. This option is not applicable for inference since LLMs are [auto-regressive](https://www.investopedia.com/terms/a/autoregressive.asp#:~:text=A%20statistical%20model%20is%20autoregressive,based%20on%20its%20past%20performance.) and, as such, require previously generated tokens to predict a given token.
 
 
 
 2. Pipeline Parallelism - here, we load a subset of the model's layers in each node and sequentially pass activations until we reach the network's end. Intuitively, because there is a sequential dependency between nodes, we can expect that there will be no gains from concurrently processing data in multiple machines. However, we can split a large model that would typically not fit in memory in multiple machines since the parameter size per node should be 1/n for n nodes.
 
-3. Tensor Parallelism - in tensor parallelism, we leverage the fact that matrix multiplication is a problem that is trivially parallelizable. Each node maintains all layers of the network, but for each layer, only a fraction of the parameters. In this configuration, we can process each layer in parallel in multiple nodes, reducing the memory usage and the compute requirements in each node.
+3. Tensor Parallelism - which leverages the fact that matrix multiplication is a problem that is trivially parallelizable. Each node maintains all layers of the network, but for each layer, only a fraction of the parameters. In this configuration, we can process each layer in parallel in multiple nodes, reducing the memory usage and the compute requirements in each node.
 
 There are other ways to distribute the computation of LLMs, but for now, I will focus first on understanding tensor parallelism, specifically the [MegatronLM paper from Nvidia](https://arxiv.org/abs/1909.08053).
 
@@ -47,7 +47,7 @@ There are other ways to distribute the computation of LLMs, but for now, I will 
 
 One of the key ideas of the MegatronLM paper is that we can leverage the mathematical properties of matrix multiplication to distribute our computation. The paper focuses on applying their ideas to the transformer model. Specifically, we will be applying these ideas to the GPT-2 architecture, which is a decoder-only transformer. 
 
-To better understand the paper, I implemented some ideas using Andrej's GPT-2 nanoGPT implementation as a reference. The code can be found [here](https://github.com/mlashcorp/distributed-inference), and I will reference it as I go through the paper.
+To better understand the paper, I implemented some of these ideas using Andrej's GPT-2 nanoGPT implementation as a reference. The code can be found [here](https://github.com/mlashcorp/distributed-inference), and I will reference it as I go through the paper.
 
 —
 
@@ -103,9 +103,9 @@ For the second linear layer, we must partition its parameter matrix along its ro
 
 ![gemm](gemm-2.png#center)
 
-After applying the non-linearity, each node will have a resulting 1x2 matrix (lime green and brown in node 1, dark red and magenta in node 2) that contains the result in the correct format, but to calculate the final result of the MLP block, we must take both matrices from the 2 nodes and add them (using an [all_reduce operation](https://pytorch.org/docs/stable/distributed.html#torch.distributed.all_reduce)) to get the final result.
+After applying the non-linearity, each node will have a resulting 1x2 matrix (lime green and brown in node 1, dark red and magenta in node 2) that contains the result in the correct format. However, to calculate the final result of the MLP block, we must take both matrices from the 2 nodes and add them (using an [all_reduce operation](https://pytorch.org/docs/stable/distributed.html#torch.distributed.all_reduce)) to get the final result.
 
-This is the key strategy that the authors also use in the self-attention block. I won't go into details of that here, but will briefly mention it as we go through the code.
+This is the key strategy that the authors also use in the self-attention block. 
 
 ## Adapting NanoGPT to run in parallel
 
@@ -199,4 +199,6 @@ Finally, in the forward pass, we must sum the result of this operation across al
         return x
 ```
 
-The same idea is applied to the self-attention block, and I invite you to read the code and try it out. That's all for today, next I will finish implementing the paper by distributing the embeddings, and use Torch's all_reduce and run the code in different nodes. See you then!
+The same idea is applied to the self-attention block, and I invite you to read the code and try it out. 
+
+That's all for today, next I will finish implementing the paper by distributing the embeddings, and use Torch's all_reduce and run the code in different nodes. See you then!
