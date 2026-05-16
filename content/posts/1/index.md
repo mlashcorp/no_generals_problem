@@ -1,7 +1,7 @@
 ---
 title: "LLM Distributed Inference for Fun and not Profit - Part 1"
 date: 2023-10-21T16:31:22+01:00
-draft: false
+draft: true
 math: katex
 ---
 
