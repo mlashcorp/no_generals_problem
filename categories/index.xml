@@ -9,7 +9,8 @@
       <url>https://mlashcorp.github.io/no_generals_problem/papermod-cover.png</url>
       <link>https://mlashcorp.github.io/no_generals_problem/papermod-cover.png</link>
     </image>
-    <generator>Hugo -- gohugo.io</generator>
-    <language>en</language><atom:link href="https://mlashcorp.github.io/no_generals_problem/categories/index.xml" rel="self" type="application/rss+xml" />
+    <generator>Hugo</generator>
+    <language>en</language>
+    <atom:link href="https://mlashcorp.github.io/no_generals_problem/categories/index.xml" rel="self" type="application/rss+xml" />
   </channel>
 </rss>
