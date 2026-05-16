@@ -27,6 +27,13 @@ jobs:
       - name: Build
         run: hugo --minify
 
+      - name: Verify Cloudflare Pages project exists
+        uses: cloudflare/wrangler-action@v3
+        with:
+          wranglerVersion: "4"
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          command: pages project list
+
       - name: Publish Preview to Cloudflare Pages
         id: cloudflare
         uses: cloudflare/wrangler-action@v3
@@ -36,7 +43,6 @@ jobs:
           command: >-
             pages deploy public
             --project-name=${{ vars.CLOUDFLARE_PAGES_PROJECT_NAME }}
-            --account-id=${{ vars.CLOUDFLARE_ACCOUNT_ID }}
             --branch=pr-${{ github.event.pull_request.number || github.run_number }}
 
       - name: Comment Preview URL
