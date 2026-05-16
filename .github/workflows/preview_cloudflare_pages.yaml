@@ -2,6 +2,9 @@
 name: Cloudflare Pages Preview
 
 on:
+  push:
+    branches:
+      - "preview/**"
   pull_request:
   workflow_dispatch:
 
@@ -27,6 +30,15 @@ jobs:
       - name: Build
         run: hugo --minify
 
+      - name: Resolve preview branch name
+        id: branch
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "name=pr-${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Verify Cloudflare Pages project exists
         uses: cloudflare/wrangler-action@v3
         with:
@@ -45,7 +57,7 @@ jobs:
           command: >-
             pages deploy public
             --project-name=${{ vars.CLOUDFLARE_PAGES_PROJECT_NAME }}
-            --branch=pr-${{ github.event.pull_request.number || github.run_number }}
+            --branch=${{ steps.branch.outputs.name }}
 
       - name: Comment Preview URL
         if: github.event_name == 'pull_request'
