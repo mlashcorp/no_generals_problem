@@ -19,11 +19,8 @@ minify:
 
 languages:
     en:
-        label: "English"
+        languageName: "English"
         weight: 1
-        social:
-          github: "https://github.com/mlashcorp"
-          linkedin: "https://www.linkedin.com/in/jos%C3%A9-c%C3%B4rte-real-72721a15/"
         taxonomies:
           category: categories
           tag: tags
@@ -139,7 +136,7 @@ privacy:
         disabled: false
         simple: true
 
-    x:
+    twitter:
         disabled: false
         enableDNT: true
         simple: true
@@ -155,5 +152,5 @@ privacy:
 services:
     instagram:
         disableInlineCSS: true
-    x:
+    twitter:
         disableInlineCSS: true
