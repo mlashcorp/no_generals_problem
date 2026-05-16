@@ -1,205 +1,183 @@
 ---
-title: "LLM Distributed Inference for Fun and not Profit - Part 1"
-date: 2023-10-21T16:31:22+01:00
-draft: true
-math: katex
+title: "Pre-Norm: the two-line decision behind every modern transformer"
+date: 2026-05-16T22:45:00Z
+draft: false
 ---
 
-![distributed inference](ngp_1.jpeg)
+# Pre-Norm: the two-line decision behind every modern transformer
 
-Recently, I became very interested in learning and understanding how LLMs work. Specifically, I was curious about how LLMs are used at scale (i.e., with multiple nodes). 
+*Post 1 of the nanochat architecture series. Each post tracks a structural decision in nanochat's commit history and runs the experiment to show why it matters.*
 
-One of the best resources I found to learn about LLMs was Andrej Karpathy's YouTube video, where he [created GPT-2 from scratch](https://www.youtube.com/watch?v=kCc8FmEb1nY)
-.
+---
 
-> Also, if, like me, your fundamentals on neural networks are a bit rusty, he has a [whole series](https://karpathy.ai/zero-to-hero.html) where he builds up from the basic concepts of neural nets up to the transformer model.
+## The question in code
 
-—
+Here is nanochat's transformer block. Two variants, one difference:
 
-Having learned the basics of how a Transformer model works, it was time to dive into the gory details of distributing the computation of an LLM. 
+```python
+# Post-LN: normalize after the residual addition (Vaswani et al. 2017)
+x = norm(x + self.attn(x, cos_sin, kv_cache))
+x = norm(x + self.mlp(x))
 
-My intuition told me to start with the problem of distributing the forward pass (inference, in which we provide input to an LLM and get generated text as a result), if nothing else, because it felt like an easier problem to tackle compared to distributed training.
-
-Most of the work I've seen focuses on Training parallelism - using multiple machines to accelerate the process of training the transformer model. However, training a neural network requires both forward and backward passes, so we should be able to leverage existing techniques used for training for my goal of distributing inference. 
-
-To me, it makes intuitive sense that most information about LLM parallelism is related to training. This is a non-interactive operation (not sensitive to latency) that is quite compute-intensive. LLM inference, on the other hand, is typically used in applications where the time to response is critical (such as chatGPT). In a distributed setting, unless the problem we are tackling is [embarrassingly parallelizable](https://en.wikipedia.org/wiki/Embarrassingly_parallel), we can expect that the need to synchronize data between nodes will add latency to our application. However, I believe there are still several applications that would benefit from distributing inference at the cost of latency (such as batch operations that require LLM capabilities), and I'm also keen to explore how fast inference can be performed using multiple nodes.
-
-In this blog series, I will explore existing algorithms to perform distributed inference for LLMs, their limitations and tradeoffs, and (try to) implement them from scratch to understand them better.
-
-## How many ways can you split a matrix?
-
-Naturally, there already exists plenty of work dedicated to distributing the training of LLMs, and as I said, many of the concepts and techniques developed for parallel training should be applicable to inference as well. OpenAI provides a [great starting point](https://openai.com/research/techniques-for-training-large-neural-networks) to understand how researchers in the field have tackled this problem. 
-
-There are several techniques to perform parallel training of LLMs, but for the sake of simplicity, I will start by considering three popular options:
-
-1. Data Parallelism - where we load the entire model in each node but only give each node a part of the training data. Gradients are then averaged across workers. This option is not applicable for inference since LLMs are [auto-regressive](https://www.investopedia.com/terms/a/autoregressive.asp#:~:text=A%20statistical%20model%20is%20autoregressive,based%20on%20its%20past%20performance.) and, as such, require previously generated tokens to predict a given token.
-
-
-
-2. Pipeline Parallelism - here, we load a subset of the model's layers in each node and sequentially pass activations until we reach the network's end. Intuitively, because there is a sequential dependency between nodes, we can expect that there will be no gains from concurrently processing data in multiple machines. However, we can split a large model that would typically not fit in memory in multiple machines since the parameter size per node should be 1/n for n nodes.
-
-3. Tensor Parallelism - which leverages the fact that matrix multiplication is a problem that is trivially parallelizable. Each node maintains all layers of the network, but for each layer, only a fraction of the parameters. In this configuration, we can process each layer in parallel in multiple nodes, reducing the memory usage and the compute requirements in each node.
-
-There are other ways to distribute the computation of LLMs, but for now, I will focus first on understanding tensor parallelism, specifically the [MegatronLM paper from Nvidia](https://arxiv.org/abs/1909.08053).
-
-
-## Tensor Parallelism with MegatronLM
-
-One of the key ideas of the MegatronLM paper is that we can leverage the mathematical properties of matrix multiplication to distribute our computation. The paper focuses on applying their ideas to the transformer model. Specifically, we will be applying these ideas to the GPT-2 architecture, which is a decoder-only transformer. 
-
-To better understand the paper, I implemented some of these ideas using Andrej's GPT-2 nanoGPT implementation as a reference. The code can be found [here](https://github.com/mlashcorp/distributed-inference), and I will reference it as I go through the paper.
-
-—
-
-
-Decoder transformers are composed of several blocks of self-attention and fully connected layers. We will focus on section 3 of the paper, where the authors provide an implementation both for the fully connected layer (MLP) and for the attention layer.
-
-![decoder](decoder.png#center)
-
-### Parallelizing the MLP
-
-A multilayer perceptron is a kind of neural network. It is a fully connected network with a non-linear activation function. In GPT-2, this MLP has 2 linear layers with a GeLU non-linearity in between them. 
-
-```py
-def forward(self, x):
-    _, T, _ = x.size() 
-    x = self.c_fc(x)   # linear layer
-    x = self.gelu(x)   # activation
-    x = self.c_proj(x) # linear layer
+# Pre-LN: normalize before the sublayer (every modern model)
+x = x + self.attn(norm(x), cos_sin, kv_cache)
+x = x + self.mlp(norm(x))
 ```
 
-The key idea from the paper is that we can split the parameters of each linear layer in this MLP across nodes, but how we split the parameters and reconcile the results is worth explaining.
+That is the entire structural difference between Post-LN and Pre-LN. Move the norm call inside the sublayer branch instead of wrapping the residual sum. Two characters of code rearrangement.
 
-The following illustration shows a simple representation of a multiplication of an input 1x2 matrix by a 2x2 matrix, the result of which will be a 1x2 matrix.
+The original transformer (Vaswani et al. 2017) used Post-LN. Every major model since GPT-3 (2020) uses Pre-LN: LLaMA, PaLM, Gemma, Mistral, and nanochat. This post explains what changed, runs the experiment on a 135M-parameter model to show the difference quantitatively, and covers one finding the textbook treatment misses.
 
+---
 
-![gemm](gemm-1.png#center)
+## A brief history of putting norm in the wrong place
 
+Normalization in deep networks did not begin with transformers.
 
-If we split the 2x2 matrix across its rows, each node would have a 1x2 result matrix, but the values would not be correct until we summed the matrices from both nodes. If, on the other hand, we split the 2x2 matrix across its columns, as shown in the illustration above, each node will have a 1x1 matrix with the correct final result.
+![Normalization timeline](images/fig0_normalization_timeline.png)
 
-In the transformer MLP, we can think of the blue matrix as the input and the 2x2 matrix (in yellow and red) as the parameters of the linear layer. The number of columns represents the hidden dimension of the linear layer, and the number of rows must match the columns of our input. The GPT-2 paper actually uses 4 * n_embed for the hidden dimension, but for simplicity's sake, I'll use n_hidden = n_embed.
+LeCun et al. (1998) established that normalized inputs help gradient descent converge. Batch Normalization (Ioffe & Szegedy 2015) extended this to internal activations and transformed CNN training, enabling 100+ layer networks. It failed on sequence models: batch statistics are unreliable for variable-length inputs, and normalizing across the batch dimension leaks information between samples.
 
+Layer Normalization (Ba et al. 2016) fixed this. Instead of normalizing across the batch, it normalizes across the feature dimension -- mean and variance computed over all features for a single token. No batch size dependency, identical behavior at train and inference time.
 
-To calculate the output of the MLP, we need to [multiply the two matrices](https://en.wikipedia.org/wiki/Matrix_multiplication). This is where we can split the 2x2 matrix across the two columns sending each split to a different node, then send the full input matrix to both nodes, and finally, in each node, independently (and in parallel), calculate each result element (green and pink elements in the figure). 
+When Vaswani et al. built the transformer in 2017, LayerNorm had just been published the year before. They applied it in Post-LN placement: `x = LayerNorm(x + Sublayer(x))`. This was not an analyzed design choice. It was the natural way to add a normalization component to a residual block. No one had examined whether the position of the norm relative to the residual addition mattered for gradient flow.
 
-> This approach splits the parameter matrix of the linear layer across multiple nodes, reducing the amount of memory and computation that each node must do. The entire input matrix must still be passed to all nodes, so we get sublinear distribution gains from this operation.
+It matters.
 
-![fig3a](fig3a.png#center)
+Nguyen & Salazar (2019) found empirically that Pre-LN trains more stably. Xiong et al. (2020) proved why. GPT-3 switched to Pre-LN the same year. RMSNorm (Zhang & Sennrich 2019), which drops mean-centering from LayerNorm and is 7-64% faster with comparable performance, became the norm of choice for Pre-LN models -- including nanochat, which uses RMSNorm with no learnable parameters.
 
+---
 
-The diagram above represents part of Figure 3a from the paper. In it, the authors explain the key idea of first splitting the A parameter matrix by columns and the B matrix by rows. As we saw before, if we split the second element of matrix multiplication by columns, each node will have a result matrix with a subset of the columns, whereas if we split by rows, the result matrix will have the correct result shape, but we will need to reduce (synchronize) the data between all nodes to arrive at the correct result.
+## Why Post-LN fails: the gradient analysis
 
-The authors opted for this order of operations to minimize synchronization points. A GeLU is a non-linear operation that can only be safely applied in parallel if we split the first linear layer across its columns, resulting in the equation:
+Xiong et al. (2020, Theorem 1) showed that in a Post-LN transformer at initialization, the gradient norm for layer $i$ depends exponentially on the distance from the output. Layers near the output receive large gradients; layers near the input receive vanishingly small ones.
 
-
-$$ [Y1, Y2] = [GeLU(X A1), GeLU(X A2)] $$
-
-Where A is the parameters of the linear layer, A1 has the first half of the columns of the matrix, and A2 is the second half. As we saw before, we can independently calculate the resulting Y matrix in different nodes. 
-
-Had the authors split A across its rows, they would need to synchronize data before applying the non-linear activation function - since each node would have a result matrix with the correct format after the first linear layer, but with only half of the parameters having been summed.
-
-For the second linear layer, we must partition its parameter matrix along its rows (matrices B1 and B2) so that matrix multiplication rules are preserved. 
-
-![gemm](gemm-2.png#center)
-
-After applying the non-linearity, each node will have a resulting 1x2 matrix (lime green and brown in node 1, dark red and magenta in node 2) that contains the result in the correct format. However, to calculate the final result of the MLP block, we must take both matrices from the 2 nodes and add them (using an [all_reduce operation](https://pytorch.org/docs/stable/distributed.html#torch.distributed.all_reduce)) to get the final result.
-
-This is the key strategy that the authors also use in the self-attention block. 
-
-## Adapting NanoGPT to run in parallel
-
-To apply the ideas discussed in the previous section, I adapted the [NanoGPT implementation](https://github.com/karpathy/nanoGPT) so that the MLP and the self-attention blocks can be split across several nodes. My goal was to create a minimally viable implementation, that favors readibility against completeness or sophistication. 
-
-The entire GPT-2 implementation is still contained in a single file, distributed_model.py. The relevant files from the repo are:
+The mechanism is straightforward. In Post-LN, the norm wraps the entire residual sum:
 
 ```
-.
-├── run.py                     <- CLI application wrapper
-├── distributed_inference.py   <- Launches the processes and waits for the results.
-├── distributed_model.py       <- GPT-2 with tensor parallelism
-├── distributed_state.py       <- Simulated distributed all reduce
-└── download_model.py          <- Use this to download the GPT-2 124M model from HF
+gradient flows back from loss
+  → through norm at layer L
+  → through residual addition
+  → through norm at layer L-1
+  → through residual addition
+  → ...
+  → through norm at layer 1
+  → to the input
 ```
 
-A key simplification done in this codebase was the introduction of a distributed state module. This module implements a naive all_reduce operation, using Python's [BaseManager process](https://docs.python.org/3/library/multiprocessing.html#multiprocessing.managers.BaseManager) as a synchronization point between processes. When you run this code using multiple processes, each time a worker calls the all_reduce function, it will publish their intermediate results to the base manager, and only when all workers have submited their results, they all get the final, reduced version of the matrix:
+Each normalization layer in the backward pass introduces a multiplicative factor. Across L layers, this factor compounds. Near the output it amplifies; near the input it attenuates. The result is exponential gradient imbalance: layers 10 and 11 are doing all the learning, while layers 0 through 7 barely update.
 
-```py
-def all_reduce(self, op_id: str, tensor: torch.Tensor):
-    with self.cv:
-        if op_id not in self.state:
-            self.state[op_id] = (tensor, 1)
-        else:
-            state_tensor, count = self.state[op_id]
-            self.state[op_id] = (
-                torch.add(state_tensor, tensor), count + 1)
+In Pre-LN, the norm is on the sublayer branch, not on the residual path:
 
-        if self.state[op_id][1] < self.number_of_workers:
-            self.cv.wait()
-        else:
-            self.cv.notify_all()
-        return self.state[op_id][0]
+```
+gradient flows back from loss
+  → through the direct residual path (no norms)
+  → to the input
 ```
 
-For each operation (uniquely identified using the op_id - using the worker index, the block name, and the current token index) we sum the input matrix with the existing state, and block the caller on a condition variable. When the final worker calls the all_reduce function, we notify all blocked users and return the final matrix.
+The residual connection carries the gradient back through all layers without passing through any norm operations. Gradient norms stay bounded regardless of depth.
 
-> The points where we use all reduce are the synchronization points between machines. The amount of data we need to transfer and the inter-node latency will be the bottlenecks for the forward pass performance.
+---
 
-This first version of the code does not address all aspects presented in the paper. I simply focused on implementing the distributed MLP and self-attention blocks. Other aspects such as word, position and transposed embeddings were not distributed yet.
+## The experiment
 
-There are two key areas worth exploring in this code. 1) how I'm loading the model shard in each node; and 2) how I'm setting the MLP and Self-Attention parameter sizes. Let's look at model loading first.
+To measure this on real training runs, we take nanochat's initial commit architecture (October 13, 2025, commit `3a5e0bc5`) and train two models:
 
-### Sharded model loading
+- **Pre-LN**: norm_placement="pre" (the original nanochat architecture)
+- **Post-LN**: norm_placement="post" (two lines changed in `Block.forward`)
 
-Model loading is done in the load_layers function of the distributed_mode.py module. I leverage safetensors to load a slice of each layer selectively. As an example:
+Everything else is identical: same architecture, same data, same random seed, same hyperparameters.
 
-```py
-if "mlp.c_fc.weight" in layer:
-    # Partition by column. This will convert the slice to a Tensor object
-    tensor_slice = f.get_slice(layer)
-    tensors[layer] = tensor_slice[:, mlp_start_idx:mlp_end_idx]
+**Architecture**: 12 layers, 768 embedding dim, 6 attention heads, RMSNorm (no learnable params), RoPE, QK-Norm, ReLU² activation, untied embeddings, logit softcap. 135.3M parameters total.
+
+**Training**: FinewebEdu-100B dataset, 5,160 steps, ~2.7B tokens. Batch size 524,288 tokens. Muon optimizer for transformer matrices, AdamW for embeddings and lm_head. Gradient clipping at 1.0. No warmup (warmup_ratio=0.0). LR warmdown from step 4128 (last 20% of training). Single RTX 5090, ~4.3 hours per run.
+
+**Metric**: Validation BPB (bits-per-byte) on a fixed FinewebEdu validation split, computed every 250 steps. BPB normalizes for token length: `BPB = Σ(nats) / (ln(2) × Σ(bytes))`, so tokens representing more bytes count proportionally more. This makes it tokenizer-vocabulary-independent. Lower is better.
+
+---
+
+## Results
+
+### Gradient imbalance: theory confirmed
+
+![Per-layer gradient norms at step 50](images/fig1_per_layer_grad_norms.png)
+
+At step 50 -- the earliest step with meaningful gradients given nanochat's zero-initialized output projections -- the gradient imbalance is already stark. For the MLP output projection (`mlp.c_proj`), Post-LN layer 11 has a gradient L2 norm 79x larger than layer 0. Pre-LN's ratio across the same layers is 1.6x.
+
+The attention output projection (`attn.c_proj`) shows the same pattern: Post-LN layer 11 is 33x larger than layer 0; Pre-LN is 2.5x.
+
+This is Xiong et al.'s Theorem 1, measured directly. The early layers of Post-LN are receiving almost no gradient signal. They are not learning.
+
+### Quality gap: consistent and widening
+
+![Validation BPB over training](images/fig2_val_bpb.png)
+
+The quality gap opens immediately. At step 250 (the first validation point), Pre-LN already leads by 0.11 BPB. The gap holds steady at 0.21--0.23 BPB through the middle of training (steps 1000--4000) as Post-LN improves but cannot close the distance.
+
+Post-LN's best result is 1.8885 BPB at step 3750. Pre-LN reaches 1.8885 before step 500 and has long since moved past it.
+
+### The warmdown catastrophe
+
+The more striking finding comes at step 4128, when LR warmdown begins.
+
+Warmdown is a final-phase LR decay that lets the model anneal into a lower-loss basin. For Pre-LN, it works as intended: BPB improves from 1.7031 to 1.6372 over the final 1,032 steps (−0.066 BPB).
+
+For Post-LN, it fails catastrophically. Within the first two steps of warmdown, a gradient spike of norm 15.1 corrupts the model's weights. With the learning rate now decaying toward zero, the model has no capacity to recover. BPB jumps from 1.9089 to 2.42 and stays there for the remainder of training.
+
+This failure mode is not directly described in Xiong et al., but it follows from their mechanism. Post-LN accumulated gradient instability throughout training -- 103 gradient spikes above norm 2.0 vs Pre-LN's 10 across the full 5,160 steps. Each spike left the model in a slightly degraded state. The damage was manageable when the LR was large enough to make corrective updates. Warmdown removed that safety valve.
+
+![Global gradient norm over training](images/fig3_global_grad_norm.png)
+
+Pre-LN's gradient trace is nearly invisible at the bottom of the chart. Post-LN's spikes are pervasive, clustered in the second half of training, with multiple events exceeding norm 20 and two above 50.
+
+### Summary
+
+| Metric | Pre-LN | Post-LN |
+|--------|--------|---------|
+| Best val BPB | **1.6372** (step 5160) | 1.8885 (step 3750) |
+| Final val BPB | **1.6372** | 2.4164 |
+| Gradient spikes > 2.0 | 10 | 103 |
+| Warmdown effect on BPB | −0.066 | +0.507 |
+
+---
+
+## What this means
+
+Pre-LN is the correct structural default. It trains stably without warmup workarounds, tolerates aggressive LR schedules including warmdown, and produces consistently better final quality. The theoretical prediction from Xiong et al. holds at 12 layers and is not subtle -- the gradient imbalance is measurable from step 50 and the quality gap is visible from the first validation point.
+
+The one thing to note: Pre-LN does not have the last word on this problem. The same 2024--2025 literature that validated Pre-LN also identified that it introduces a different gradient imbalance. In Pre-LN models, the residual stream receives unfiltered gradient contributions from all later layers, but each individual layer's gradient is diluted relative to Post-LN's output layers. The deep layers of Pre-LN models tend to be underutilized -- this is documented in the Mix-LN paper (Li et al., ICLR 2025) and corroborated by how easily Pre-LN models' late layers can be pruned without quality loss.
+
+Pre-LN solved Post-LN's instability and became the universal default. But norm placement is an active research area, not a closed problem. Mix-LN, Peri-LN, and HybridNorm are all attempting to recover Post-LN's per-layer expressivity while keeping Pre-LN's gradient stability. None has yet displaced Pre-LN as the default.
+
+For nanochat, the initial commit uses Pre-LN. That is the right starting point. Later commits add other components -- residual lambdas, value embeddings, custom initialization -- that interact with gradient flow in different ways. Those experiments are the subject of the next posts in this series.
+
+---
+
+## Reproducing this experiment
+
+The two training runs require a single GPU with at least 24GB VRAM and about 4.3 hours each. The training script and visualization notebook are in the nanochat repository under `scripts/post01_train.py` and `blog/post01_pre_norm/visualizations.ipynb`.
+
+```bash
+# Pre-LN run
+python scripts/post01_train.py --norm-placement pre --output-dir post01_data/pre_ln
+
+# Post-LN run
+python scripts/post01_train.py --norm-placement post --output-dir post01_data/post_ln
 ```
-Here I'm loading a slice of the first linear layer of the MLP block by loading only the columns allocated to this worker node. Start and end indeces for the columns are calculated using this helper function:
 
-```py
-        def get_worker_partition(C: int = 768,
-                                 worker_index: int = 0,
-                                 number_of_workers: int = 1):
-            partition_size = C // number_of_workers
-            # Calculate the "chunk" that this node will process
-            partition_start = worker_index * partition_size
-            partition_end = partition_start + partition_size
-            return (partition_start, partition_end)
-```
+Data from these runs, including per-step gradient norms, activation statistics, and validation BPB, is logged to JSONL files for analysis in the companion notebook.
 
-Then, in the MLP definition, I change the shape of the linear layers to match the way we are loading the model. If we recall the paper, we must partition the first linear layer across its columns, and the second across its rows (by dividing by config.number_of_workers):
+---
 
-```py
-    self.c_fc = nn.Linear(config.n_embd, (4 * config.n_embd) //
-                            config.number_of_workers, bias=config.bias)
-    self.gelu = nn.GELU()
-    self.c_proj = nn.Linear(
-        (4 * config.n_embd) // config.number_of_workers, config.n_embd, bias=config.bias)
-```
+## References
 
-Finally, in the forward pass, we must sum the result of this operation across all nodes by using the (simulated) all_reduce operation:
+- Xiong et al. (2020). On Layer Normalization in the Transformer Architecture. ICML 2020. [arXiv:2002.04745](https://arxiv.org/abs/2002.04745)
+- Vaswani et al. (2017). Attention Is All You Need. NeurIPS 2017. [arXiv:1706.03762](https://arxiv.org/abs/1706.03762)
+- Ba et al. (2016). Layer Normalization. [arXiv:1607.06450](https://arxiv.org/abs/1607.06450)
+- Zhang & Sennrich (2019). Root Mean Square Layer Normalization. NeurIPS 2019. [arXiv:1910.07467](https://arxiv.org/abs/1910.07467)
+- Nguyen & Salazar (2019). Transformers without Tears. IWSLT 2019. [arXiv:1910.05895](https://arxiv.org/abs/1910.05895)
+- Li et al. (2024). Mix-LN: Unleashing the Power of Deeper Layers by Combining Pre-LN and Post-LN. ICLR 2025. [arXiv:2412.13795](https://arxiv.org/abs/2412.13795)
 
-```py
-    def forward(self, x):
-        _, T, _ = x.size()  # batch size, sequence length, embedding dimensionality (n_embd)
-        x = self.c_fc(x)    # linear layer
-        x = self.gelu(x)    # activation
-        x = self.c_proj(x)  # linear layer
+---
 
-        # All reduce the output of the MLP. (Synchronization point)
-        op_id = f"{self.layer_id}_{T}"
-        x = self.reduce_controller.all_reduce(op_id, x)
-
-        x = self.dropout(x)
-        return x
-```
-
-The same idea is applied to the self-attention block, and I invite you to read the code and try it out. 
-
-
-That's all for today, next I will finish implementing the paper by distributing the embeddings, and use Torch's all_reduce and run the code in different nodes. See you then!
+*Next post: nanochat's weight initialization scheme (Jan 1, 2026 commit) and what it changes about early training dynamics.*
