@@ -1,6 +1,7 @@
 baseURL: "https://mlashcorp.github.io/no_generals_problem"
 title: NGP
-paginate: 5
+pagination:
+    pagerSize: 5
 theme: PaperMod
 
 enableInlineShortcodes: true
