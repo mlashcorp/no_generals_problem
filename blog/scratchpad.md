@@ -58,6 +58,25 @@
 
 - The deploy step publishes `./public` to `gh-pages` using `peaceiris/actions-gh-pages`.
 
+## Private preview hosting (Cloudflare Pages)
+
+- Workflow: `.github/workflows/preview_cloudflare_pages.yaml`
+- Trigger: pull requests and manual run (`workflow_dispatch`).
+- Result: deploys a preview build to Cloudflare Pages and comments the preview URL on the PR.
+
+### Required GitHub settings
+
+1. Repository secret `CLOUDFLARE_API_TOKEN`
+   - Create in Cloudflare with `Cloudflare Pages:Edit` permission for the target account.
+2. Repository variable `CLOUDFLARE_PAGES_PROJECT_NAME`
+   - Example: `no-generals-problem-preview`
+
+### Required Cloudflare Access setup (to keep previews private)
+
+1. In Cloudflare Zero Trust, create an Access application for `*.pages.dev` host of your project.
+2. Add policy allowing only your email (or your team emails).
+3. Keep production GitHub Pages public; this affects only preview URLs on Cloudflare.
+
 ## Useful commands
 
 ```bash
