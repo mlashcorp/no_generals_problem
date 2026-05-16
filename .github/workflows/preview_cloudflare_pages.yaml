@@ -32,6 +32,7 @@ jobs:
         with:
           wranglerVersion: "4"
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           command: pages project list
 
       - name: Publish Preview to Cloudflare Pages
@@ -40,6 +41,7 @@ jobs:
         with:
           wranglerVersion: "4"
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           command: >-
             pages deploy public
             --project-name=${{ vars.CLOUDFLARE_PAGES_PROJECT_NAME }}
