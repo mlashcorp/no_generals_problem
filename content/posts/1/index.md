@@ -5,8 +5,6 @@ draft: false
 description: "Pre-LN vs Post-LN on a 135M tiny transformer trained on a single RTX 5090."
 ---
 
-# Pre-Norm: the two-line decision behind every modern transformer
-
 *Post 1 of the nanochat architecture series. Each post tracks a structural decision in nanochat's commit history and runs the experiment to show why it matters.*
 
 ---
@@ -35,7 +33,11 @@ The original transformer (Vaswani et al. 2017) used Post-LN. Every major model s
 
 Normalization in deep networks did not begin with transformers.
 
-![Normalization timeline](images/fig0_normalization_timeline.png)
+Quick timeline:
+- 2015: BatchNorm transforms CNN training but is awkward for sequence models.
+- 2016: LayerNorm makes token-wise normalization practical for transformers.
+- 2017: Transformer adopts Post-LN by default.
+- 2019-2020: Pre-LN evidence and theory establish stability advantages.
 
 LeCun et al. (1998) established that normalized inputs help gradient descent converge. Batch Normalization (Ioffe & Szegedy 2015) extended this to internal activations and transformed CNN training, enabling 100+ layer networks. It failed on sequence models: batch statistics are unreliable for variable-length inputs, and normalizing across the batch dimension leaks information between samples.
 
