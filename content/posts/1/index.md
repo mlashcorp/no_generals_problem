@@ -2,6 +2,7 @@
 title: "Pre-Norm: the two-line decision behind every modern transformer"
 date: 2026-05-16T22:45:00Z
 draft: false
+description: "Pre-LN vs Post-LN on a 135M tiny transformer trained on a single RTX 5090."
 ---
 
 # Pre-Norm: the two-line decision behind every modern transformer
