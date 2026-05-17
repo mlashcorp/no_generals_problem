@@ -7,8 +7,6 @@ description: "Pre-LN vs Post-LN on a 135M tiny transformer trained on a single R
 
 *Post 1 of the nanochat architecture series. Each post tracks a structural decision in nanochat's commit history and runs the experiment to show why it matters.*
 
----
-
 ## The question in code
 
 Here is nanochat's transformer block. Two variants, one difference:
@@ -29,8 +27,6 @@ That is the entire structural difference between Post-LN and Pre-LN. Move the no
 
 The original transformer [4] used Post-LN. Every major model since GPT-3 [8] uses Pre-LN: LLaMA, PaLM, Gemma, Mistral, and nanochat. This post explains what changed, runs the experiment on a 135M-parameter model to show the difference quantitatively, and covers one finding the textbook treatment misses.
 
----
-
 ## A brief history of putting norm in the wrong place
 
 Normalization in deep networks did not begin with transformers.
@@ -46,8 +42,6 @@ When Vaswani et al. built the transformer [4], LayerNorm had just been published
 It matters.
 
 Nguyen & Salazar [5] found empirically that Pre-LN trains more stably. Xiong et al. [7] proved why. GPT-3 [8] switched to Pre-LN the same year. RMSNorm [6], which drops mean-centering from LayerNorm and is 7-64% faster with comparable performance, became the norm of choice for Pre-LN models -- including nanochat, which uses RMSNorm with no learnable parameters.
-
----
 
 ## Why Post-LN fails: the gradient analysis
 
@@ -78,8 +72,6 @@ gradient flows back from loss
 
 The residual connection carries the gradient back through all layers without passing through any norm operations. Gradient norms stay bounded regardless of depth.
 
----
-
 ## The experiment
 
 To measure this on real training runs, we take nanochat's initial commit architecture (October 13, 2025, commit `3a5e0bc5`) and train two models:
@@ -94,8 +86,6 @@ Everything else is identical: same architecture, same data, same random seed, sa
 **Training**: FinewebEdu-100B dataset, 5,160 steps, ~2.7B tokens. Batch size 524,288 tokens. Muon optimizer for transformer matrices, AdamW for embeddings and lm_head. Gradient clipping at 1.0. No warmup (warmup_ratio=0.0). LR warmdown from step 4128 (last 20% of training). Single RTX 5090, ~4.3 hours per run.
 
 **Metric**: Validation BPB (bits-per-byte) on a fixed FinewebEdu validation split, computed every 250 steps. BPB normalizes for token length: `BPB = Σ(nats) / (ln(2) × Σ(bytes))`, so tokens representing more bytes count proportionally more. This makes it tokenizer-vocabulary-independent. Lower is better.
-
----
 
 ## Results
 
@@ -140,8 +130,6 @@ Pre-LN's gradient trace is nearly invisible at the bottom of the chart. Post-LN'
 | Gradient spikes > 2.0 | 10 | 103 |
 | Warmdown effect on BPB | −0.066 | +0.507 |
 
----
-
 ## What this means
 
 Pre-LN is the correct structural default. It trains stably without warmup workarounds, tolerates aggressive LR schedules including warmdown, and produces consistently better final quality. The theoretical prediction from Xiong et al. [7] holds at 12 layers and is not subtle -- the gradient imbalance is measurable from step 50 and the quality gap is visible from the first validation point.
@@ -151,8 +139,6 @@ The one thing to note: Pre-LN does not have the last word on this problem. The s
 Pre-LN solved Post-LN's instability and became the universal default. But norm placement is an active research area, not a closed problem. Mix-LN, Peri-LN, and HybridNorm are all attempting to recover Post-LN's per-layer expressivity while keeping Pre-LN's gradient stability. None has yet displaced Pre-LN as the default.
 
 For nanochat, the initial commit uses Pre-LN. That is the right starting point. Later commits add other components -- residual lambdas, value embeddings, custom initialization -- that interact with gradient flow in different ways. Those experiments are the subject of the next posts in this series.
-
----
 
 ## Reproducing this experiment
 
@@ -168,8 +154,6 @@ python scripts/post01_train.py --norm-placement post --output-dir post01_data/po
 
 Data from these runs, including per-step gradient norms, activation statistics, and validation BPB, is logged to JSONL files for analysis in the companion notebook.
 
----
-
 ## References
 
 - [1] LeCun, Y., Bottou, L., Orr, G. B., & Muller, K.-R. (1998). Efficient BackProp. In *Neural Networks: Tricks of the Trade*. https://link.springer.com/chapter/10.1007/3-540-49430-8_2
@@ -181,7 +165,5 @@ Data from these runs, including per-step gradient norms, activation statistics, 
 - [7] Xiong, R., et al. (2020). On Layer Normalization in the Transformer Architecture. ICML 2020. [arXiv:2002.04745](https://arxiv.org/abs/2002.04745)
 - [8] Brown, T., et al. (2020). Language Models are Few-Shot Learners (GPT-3). NeurIPS 2020. [arXiv:2005.14165](https://arxiv.org/abs/2005.14165)
 - [9] Li, Y., et al. (2024). Mix-LN: Unleashing the Power of Deeper Layers by Combining Pre-LN and Post-LN. ICLR 2025. [arXiv:2412.13795](https://arxiv.org/abs/2412.13795)
-
----
 
 *Next post: nanochat's weight initialization scheme (Jan 1, 2026 commit) and what it changes about early training dynamics.*
