@@ -1,6 +1,6 @@
 ---
 title: "Tiny Language Models (TLM) Series"
-date: 2026-05-16T21:30:00Z
+date: 2026-05-16T23:59:00Z
 draft: false
 description: "Series introduction: tiny language models, experimental method, and nanochat baseline."
 ---
