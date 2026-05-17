@@ -23,6 +23,8 @@ x = x + self.attn(norm(x), cos_sin, kv_cache)
 x = x + self.mlp(norm(x))
 ```
 
+![Pre-LN vs Post-LN transformer placement](images/diagram.png)
+
 That is the entire structural difference between Post-LN and Pre-LN. Move the norm call inside the sublayer branch instead of wrapping the residual sum. Two characters of code rearrangement.
 
 The original transformer [4] used Post-LN. Every major model since GPT-3 [8] uses Pre-LN: LLaMA, PaLM, Gemma, Mistral, and nanochat. This post explains what changed, runs the experiment on a 135M-parameter model to show the difference quantitatively, and covers one finding the textbook treatment misses.
@@ -33,11 +35,7 @@ The original transformer [4] used Post-LN. Every major model since GPT-3 [8] use
 
 Normalization in deep networks did not begin with transformers.
 
-Quick timeline:
-- 2015: BatchNorm transforms CNN training but is awkward for sequence models.
-- 2016: LayerNorm makes token-wise normalization practical for transformers.
-- 2017: Transformer adopts Post-LN by default.
-- 2019-2020: Pre-LN evidence and theory establish stability advantages.
+![Normalization timeline](images/timeline.png)
 
 LeCun et al. [1] established that normalized inputs help gradient descent converge. Batch Normalization [2] extended this to internal activations and transformed CNN training, enabling 100+ layer networks. It failed on sequence models: batch statistics are unreliable for variable-length inputs, and normalizing across the batch dimension leaks information between samples.
 
