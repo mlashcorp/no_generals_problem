@@ -33,14 +33,6 @@ The compactness matters because architectural experiments require attribution. I
 Nanochat also starts from a realistic transformer baseline rather than a pedagogic toy model, so it preserves enough real-world behavior for meaningful analysis. That makes the experiments more informative while keeping the system small enough for controlled iteration on commodity high-end hardware.
 
 
-## What this series is and is not
-
-This series is closer to an engineering lab notebook than a model launch report.
-
-It is not meant to derive universal architecture laws from a single setup. Results in language modeling depend on scale, data distribution, tokenizer behavior, optimizer dynamics, and evaluation protocol. The objective here is narrower: to build cumulative evidence under fixed constraints, one controlled comparison at a time.
-
-Negative results are part of that evidence. In constrained regimes, knowing that an idea fails under specific conditions can be more useful than a marginal gain from a single run.
-
 ## Experimental method
 
 Each post follows a consistent pattern:
