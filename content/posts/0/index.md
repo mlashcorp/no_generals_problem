@@ -5,42 +5,41 @@ draft: false
 description: "Series introduction: tiny language models, experimental method, and nanochat baseline."
 ---
 
-Most public discussion about language models is framed by scale: more parameters, more tokens, more GPUs, and larger pretraining budgets.
+Most public discussion about language models is framed by scale: more parameters, more tokens, more GPUs.
 
-This series starts from the opposite constraint.
+This series starts from the opposite direction. How small can you go, and still have a useful language model?
 
-The goal is to study transformer architecture decisions in a regime where every choice is expensive, every instability is visible, and iteration speed matters as much as final quality. The target object is what I will call a **tiny language model** (TLM): operationally, a model that can be trained in roughly one week on a single RTX 5090.
+The goal is to study transformer architecture choices at a scale where experiments are cheap enough to repeat, but large enough for design decisions to matter. The target object is what I will call a tiny language model (TLM): operationally, a model that can be trained in roughly one week on a single RTX 5090.
 
-This is not a universal taxonomy claim; it is a practical boundary for this series. The boundary is useful because it aligns model design with realistic solo or small-team iteration cycles: short enough to run controlled comparisons, large enough for architecture effects to be measurable.
+This scale is intentionally constrained. Training dynamics, performance bottlenecks, and best practices at tiny scale do not necessarily transfer unchanged to larger models [FREF]. That limitation is part of the point: the series studies what happens under this compute budget, not what must hold universally at every scale.
+
+This design constraint is useful because it aligns model design with realistic solo or small-team iteration cycles: short enough to run controlled comparisons, large enough for architecture effects to be measurable.
 
 Two questions motivate everything that follows:
 
 1. How do transformer architecture choices affect model behavior under constrained compute?
 2. How much useful performance can be extracted from small models before additional scale becomes the dominant lever?
 
-To investigate those questions, the series needs a baseline that is modern, inspectable, and easy to perturb in controlled ways.
+To make those questions testable, the series needs a baseline that is modern, readable, and easy to modify.
 
 That baseline is **nanochat** ([GitHub](https://github.com/karpathy/nanochat)) [1].
 
 ## Why nanochat is a suitable baseline
 
-Nanochat is an appropriate experimental substrate for this project for three reasons.
+Nanochat sits in the right middle ground for this series: compact enough to understand end-to-end, modern enough to be relevant, and simple enough to modify.
 
-First, it is compact enough to be understood end-to-end without heavy framework indirection. For architecture research, this matters: if the control flow is opaque, attribution becomes weak.
+The compactness matters because architectural experiments require attribution. If the training stack is buried under layers of framework abstraction, it becomes harder to tell whether a result comes from the intended model change or from surrounding machinery.
 
-Second, it is modern enough to be relevant. The baseline already reflects contemporary transformer design instincts, so experiments begin from a realistic point rather than from a purely pedagogical toy setup.
+Nanochat also starts from a realistic transformer baseline rather than a deliberately simplified teaching model. That makes the experiments more informative while keeping the system small enough for controlled iteration on commodity high-end hardware.
 
-Third, it is tractable on commodity high-end hardware. The one-week / single-5090 constraint is not just narrative; it is the mechanism that keeps the series grounded in reproducible engineering.
-
-Taken together, these properties make nanochat a strong middle baseline: not toy, not hyperscale.
 
 ## What this series is and is not
 
-This series is closer to an engineering lab notebook than to a model launch report.
+This series is closer to an engineering lab notebook than a model launch report.
 
-It is **not** designed to produce universal architecture laws from a single setup. External validity in language modeling depends on scale, data distribution, tokenizer behavior, optimizer dynamics, and evaluation protocol. Instead, the objective is cumulative evidence under fixed constraints: one decision at a time, one controlled comparison at a time, one explicit tradeoff at a time.
+It is not meant to derive universal architecture laws from a single setup. Results in language modeling depend on scale, data distribution, tokenizer behavior, optimizer dynamics, and evaluation protocol. The objective here is narrower: to build cumulative evidence under fixed constraints, one controlled comparison at a time.
 
-Negative results are first-class outcomes. In constrained regimes, "this idea fails under these conditions" is often more actionable than marginal gains in one run.
+Negative results are part of that evidence. In constrained regimes, knowing that an idea fails under specific conditions can be more useful than a marginal gain from a single run.
 
 ## Experimental method
 
@@ -76,11 +75,7 @@ The standard is practical: not byte-identical determinism across all environment
 
 ## Starting point
 
-Post 1 begins with a foundational transformer decision: normalization placement.
-
-At code level, the difference is small. At training-dynamics level, the consequences can be large.
-
-That asymmetry -- small structural edits, large behavioral effects -- is exactly what this series is designed to study.
+Post 1 begins with normalization placement: a small architectural change with potentially large effects on training dynamics.
 
 ## References
 
