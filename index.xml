@@ -11,6 +11,14 @@
     </image>
     <generator>Hugo</generator>
     <language>en</language>
+    <lastBuildDate>Sat, 16 May 2026 23:59:00 +0000</lastBuildDate>
     <atom:link href="https://mlashcorp.github.io/no_generals_problem/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Tiny Language Models (TLM) Series</title>
+      <link>https://mlashcorp.github.io/no_generals_problem/posts/0/</link>
+      <pubDate>Sat, 16 May 2026 23:59:00 +0000</pubDate>
+      <guid>https://mlashcorp.github.io/no_generals_problem/posts/0/</guid>
+      <description>Series introduction: tiny language models, experimental method, and nanochat baseline.</description>
+    </item>
   </channel>
 </rss>
