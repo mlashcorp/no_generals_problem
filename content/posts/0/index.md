@@ -33,7 +33,7 @@ The compactness matters because architectural experiments require attribution. I
 Nanochat also starts from a realistic transformer baseline rather than a pedagogic toy model, so it preserves enough real-world behavior for meaningful analysis. That makes the experiments more informative while keeping the system small enough for controlled iteration on commodity high-end hardware.
 
 
-## Experimental method
+## Methodology
 
 Each post follows a consistent pattern:
 
@@ -44,7 +44,7 @@ Each post follows a consistent pattern:
 - document limitations and potential confounders
 - provide reproducibility details where artifacts exist
 
-Without methodological consistency across posts, comparisons become noisy and cumulative learning breaks down.
+Methodological consistency across posts keeps comparisons clean and enables cumulative learning.
 
 ## What "performance" means in this series
 
