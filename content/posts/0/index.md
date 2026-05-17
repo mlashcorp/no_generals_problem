@@ -11,7 +11,7 @@ This series starts from the opposite direction. How small can you go, and still 
 
 The goal is to study transformer architecture choices at a scale where experiments are cheap enough to repeat, but large enough for design decisions to matter. The target object is what I will call a tiny language model (TLM): operationally, a model that can be trained in roughly one week on a single RTX 5090.
 
-This scale is intentionally constrained. Training dynamics, performance bottlenecks, and best practices at tiny scale do not necessarily transfer unchanged to larger models [FREF]. That limitation is part of the point: the series studies what happens under this compute budget, not what must hold universally at every scale.
+This scale is intentionally constrained. Training dynamics, performance bottlenecks, and best practices at tiny scale do not necessarily transfer unchanged to larger models [2]. That limitation is part of the point: the series studies what happens under this compute budget, not what must hold universally at every scale.
 
 This design constraint is useful because it aligns model design with realistic solo or small-team iteration cycles: short enough to run controlled comparisons, large enough for architecture effects to be measurable.
 
@@ -30,7 +30,7 @@ Nanochat sits in the right middle ground for this series: compact enough to unde
 
 The compactness matters because architectural experiments require attribution. If the training stack is buried under layers of framework abstraction, it becomes harder to tell whether a result comes from the intended model change or from surrounding machinery.
 
-Nanochat also starts from a realistic transformer baseline rather than a deliberately simplified teaching model. That makes the experiments more informative while keeping the system small enough for controlled iteration on commodity high-end hardware.
+Nanochat also starts from a realistic transformer baseline rather than a pedagogic toy model, so it preserves enough real-world behavior for meaningful analysis. That makes the experiments more informative while keeping the system small enough for controlled iteration on commodity high-end hardware.
 
 
 ## What this series is and is not
@@ -48,8 +48,8 @@ Each post follows a consistent pattern:
 - select one architecture decision (or tightly coupled decision pair)
 - define baseline and variant(s) explicitly
 - keep non-target variables fixed as much as possible (seed, data path, budget, schedule)
-- report both outcome metrics and mechanism-facing diagnostics
-- document limitations and plausible confounders
+- report both final metrics and training signals that explain the result
+- document limitations and potential confounders
 - provide reproducibility details where artifacts exist
 
 Without methodological consistency across posts, comparisons become noisy and cumulative learning breaks down.
@@ -80,3 +80,4 @@ Post 1 begins with normalization placement: a small architectural change with po
 ## References
 
 [1] Karpathy, A. *nanochat* (GitHub repository). https://github.com/karpathy/nanochat
+[2] Hoffmann, J., et al. (2022). *Training Compute-Optimal Large Language Models* (Chinchilla). [arXiv:2203.15556](https://arxiv.org/abs/2203.15556)
