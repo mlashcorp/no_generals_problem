@@ -11,7 +11,7 @@ This series starts from the opposite direction. How small can you go, and still 
 
 The goal is to study transformer architecture choices at a scale where experiments are cheap enough to repeat, but large enough for design decisions to matter. The target object is what I will call a tiny language model (TLM): operationally, a model that can be trained in roughly one week on a single RTX 5090.
 
-This scale is intentionally constrained. Training dynamics, performance bottlenecks, and best practices at tiny scale do not necessarily transfer unchanged to larger models [2]. That limitation is part of the point: the series studies what happens under this compute budget, not what must hold universally at every scale.
+This scale is intentionally constrained. Training dynamics, performance bottlenecks, and best practices at tiny scale do not necessarily transfer unchanged to larger models [[2]](#ref-2). That limitation is part of the point: the series studies what happens under this compute budget, not what must hold universally at every scale.
 
 This design constraint is useful because it aligns model design with realistic solo or small-team iteration cycles: short enough to run controlled comparisons, large enough for architecture effects to be measurable.
 
@@ -22,7 +22,7 @@ Two questions motivate everything that follows:
 
 To make those questions testable, the series needs a baseline that is modern, readable, and easy to modify.
 
-That baseline is **nanochat** ([GitHub](https://github.com/karpathy/nanochat)) [1].
+That baseline is **nanochat** ([GitHub](https://github.com/karpathy/nanochat)) [[1]](#ref-1).
 
 ## Why nanochat is a suitable baseline
 
@@ -79,5 +79,5 @@ Post 1 begins with normalization placement: a small architectural change with po
 
 ## References
 
-[1] Karpathy, A. *nanochat* (GitHub repository). https://github.com/karpathy/nanochat
-[2] Hoffmann, J., et al. (2022). *Training Compute-Optimal Large Language Models* (Chinchilla). [arXiv:2203.15556](https://arxiv.org/abs/2203.15556)
+- <span id="ref-1">[1]</span> Karpathy, A. *nanochat* (GitHub repository). https://github.com/karpathy/nanochat
+- <span id="ref-2">[2]</span> Hoffmann, J., et al. (2022). *Training Compute-Optimal Large Language Models* (Chinchilla). [arXiv:2203.15556](https://arxiv.org/abs/2203.15556)
