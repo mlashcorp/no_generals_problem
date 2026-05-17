@@ -14,7 +14,7 @@ description: "Pre-LN vs Post-LN on a 135M tiny transformer trained on a single R
 Here is nanochat's transformer block. Two variants, one difference:
 
 ```python
-# Post-LN: normalize after the residual addition (Vaswani et al. 2017)
+# Post-LN: normalize after the residual addition [4]
 x = norm(x + self.attn(x, cos_sin, kv_cache))
 x = norm(x + self.mlp(x))
 
@@ -25,7 +25,7 @@ x = x + self.mlp(norm(x))
 
 That is the entire structural difference between Post-LN and Pre-LN. Move the norm call inside the sublayer branch instead of wrapping the residual sum. Two characters of code rearrangement.
 
-The original transformer (Vaswani et al. 2017) used Post-LN. Every major model since GPT-3 (2020) uses Pre-LN: LLaMA, PaLM, Gemma, Mistral, and nanochat. This post explains what changed, runs the experiment on a 135M-parameter model to show the difference quantitatively, and covers one finding the textbook treatment misses.
+The original transformer [4] used Post-LN. Every major model since GPT-3 [8] uses Pre-LN: LLaMA, PaLM, Gemma, Mistral, and nanochat. This post explains what changed, runs the experiment on a 135M-parameter model to show the difference quantitatively, and covers one finding the textbook treatment misses.
 
 ---
 
@@ -39,21 +39,21 @@ Quick timeline:
 - 2017: Transformer adopts Post-LN by default.
 - 2019-2020: Pre-LN evidence and theory establish stability advantages.
 
-LeCun et al. (1998) established that normalized inputs help gradient descent converge. Batch Normalization (Ioffe & Szegedy 2015) extended this to internal activations and transformed CNN training, enabling 100+ layer networks. It failed on sequence models: batch statistics are unreliable for variable-length inputs, and normalizing across the batch dimension leaks information between samples.
+LeCun et al. [1] established that normalized inputs help gradient descent converge. Batch Normalization [2] extended this to internal activations and transformed CNN training, enabling 100+ layer networks. It failed on sequence models: batch statistics are unreliable for variable-length inputs, and normalizing across the batch dimension leaks information between samples.
 
-Layer Normalization (Ba et al. 2016) fixed this. Instead of normalizing across the batch, it normalizes across the feature dimension -- mean and variance computed over all features for a single token. No batch size dependency, identical behavior at train and inference time.
+Layer Normalization [3] fixed this. Instead of normalizing across the batch, it normalizes across the feature dimension -- mean and variance computed over all features for a single token. No batch size dependency, identical behavior at train and inference time.
 
-When Vaswani et al. built the transformer in 2017, LayerNorm had just been published the year before. They applied it in Post-LN placement: `x = LayerNorm(x + Sublayer(x))`. This was not an analyzed design choice. It was the natural way to add a normalization component to a residual block. No one had examined whether the position of the norm relative to the residual addition mattered for gradient flow.
+When Vaswani et al. built the transformer [4], LayerNorm had just been published the year before [3]. They applied it in Post-LN placement: `x = LayerNorm(x + Sublayer(x))`. This was not an analyzed design choice. It was the natural way to add a normalization component to a residual block. No one had examined whether the position of the norm relative to the residual addition mattered for gradient flow.
 
 It matters.
 
-Nguyen & Salazar (2019) found empirically that Pre-LN trains more stably. Xiong et al. (2020) proved why. GPT-3 switched to Pre-LN the same year. RMSNorm (Zhang & Sennrich 2019), which drops mean-centering from LayerNorm and is 7-64% faster with comparable performance, became the norm of choice for Pre-LN models -- including nanochat, which uses RMSNorm with no learnable parameters.
+Nguyen & Salazar [5] found empirically that Pre-LN trains more stably. Xiong et al. [7] proved why. GPT-3 [8] switched to Pre-LN the same year. RMSNorm [6], which drops mean-centering from LayerNorm and is 7-64% faster with comparable performance, became the norm of choice for Pre-LN models -- including nanochat, which uses RMSNorm with no learnable parameters.
 
 ---
 
 ## Why Post-LN fails: the gradient analysis
 
-Xiong et al. (2020, Theorem 1) showed that in a Post-LN transformer at initialization, the gradient norm for layer $i$ depends exponentially on the distance from the output. Layers near the output receive large gradients; layers near the input receive vanishingly small ones.
+Xiong et al. [7, Theorem 1] showed that in a Post-LN transformer at initialization, the gradient norm for layer $i$ depends exponentially on the distance from the output. Layers near the output receive large gradients; layers near the input receive vanishingly small ones.
 
 The mechanism is straightforward. In Post-LN, the norm wraps the entire residual sum:
 
@@ -109,7 +109,7 @@ At step 50 -- the earliest step with meaningful gradients given nanochat's zero-
 
 The attention output projection (`attn.c_proj`) shows the same pattern: Post-LN layer 11 is 33x larger than layer 0; Pre-LN is 2.5x.
 
-This is Xiong et al.'s Theorem 1, measured directly. The early layers of Post-LN are receiving almost no gradient signal. They are not learning.
+This is Xiong et al.'s Theorem 1 [7], measured directly. The early layers of Post-LN are receiving almost no gradient signal. They are not learning.
 
 ### Quality gap: consistent and widening
 
@@ -127,7 +127,7 @@ Warmdown is a final-phase LR decay that lets the model anneal into a lower-loss 
 
 For Post-LN, it fails catastrophically. Within the first two steps of warmdown, a gradient spike of norm 15.1 corrupts the model's weights. With the learning rate now decaying toward zero, the model has no capacity to recover. BPB jumps from 1.9089 to 2.42 and stays there for the remainder of training.
 
-This failure mode is not directly described in Xiong et al., but it follows from their mechanism. Post-LN accumulated gradient instability throughout training -- 103 gradient spikes above norm 2.0 vs Pre-LN's 10 across the full 5,160 steps. Each spike left the model in a slightly degraded state. The damage was manageable when the LR was large enough to make corrective updates. Warmdown removed that safety valve.
+This failure mode is not directly described in Xiong et al. [7], but it follows from their mechanism. Post-LN accumulated gradient instability throughout training -- 103 gradient spikes above norm 2.0 vs Pre-LN's 10 across the full 5,160 steps. Each spike left the model in a slightly degraded state. The damage was manageable when the LR was large enough to make corrective updates. Warmdown removed that safety valve.
 
 ![Global gradient norm over training](images/fig3_global_grad_norm.png)
 
@@ -146,9 +146,9 @@ Pre-LN's gradient trace is nearly invisible at the bottom of the chart. Post-LN'
 
 ## What this means
 
-Pre-LN is the correct structural default. It trains stably without warmup workarounds, tolerates aggressive LR schedules including warmdown, and produces consistently better final quality. The theoretical prediction from Xiong et al. holds at 12 layers and is not subtle -- the gradient imbalance is measurable from step 50 and the quality gap is visible from the first validation point.
+Pre-LN is the correct structural default. It trains stably without warmup workarounds, tolerates aggressive LR schedules including warmdown, and produces consistently better final quality. The theoretical prediction from Xiong et al. [7] holds at 12 layers and is not subtle -- the gradient imbalance is measurable from step 50 and the quality gap is visible from the first validation point.
 
-The one thing to note: Pre-LN does not have the last word on this problem. The same 2024--2025 literature that validated Pre-LN also identified that it introduces a different gradient imbalance. In Pre-LN models, the residual stream receives unfiltered gradient contributions from all later layers, but each individual layer's gradient is diluted relative to Post-LN's output layers. The deep layers of Pre-LN models tend to be underutilized -- this is documented in the Mix-LN paper (Li et al., ICLR 2025) and corroborated by how easily Pre-LN models' late layers can be pruned without quality loss.
+The one thing to note: Pre-LN does not have the last word on this problem. The same 2024--2025 literature that validated Pre-LN also identified that it introduces a different gradient imbalance. In Pre-LN models, the residual stream receives unfiltered gradient contributions from all later layers, but each individual layer's gradient is diluted relative to Post-LN's output layers. The deep layers of Pre-LN models tend to be underutilized -- this is documented in the Mix-LN paper [9] and corroborated by how easily Pre-LN models' late layers can be pruned without quality loss.
 
 Pre-LN solved Post-LN's instability and became the universal default. But norm placement is an active research area, not a closed problem. Mix-LN, Peri-LN, and HybridNorm are all attempting to recover Post-LN's per-layer expressivity while keeping Pre-LN's gradient stability. None has yet displaced Pre-LN as the default.
 
@@ -174,12 +174,15 @@ Data from these runs, including per-step gradient norms, activation statistics, 
 
 ## References
 
-- Xiong et al. (2020). On Layer Normalization in the Transformer Architecture. ICML 2020. [arXiv:2002.04745](https://arxiv.org/abs/2002.04745)
-- Vaswani et al. (2017). Attention Is All You Need. NeurIPS 2017. [arXiv:1706.03762](https://arxiv.org/abs/1706.03762)
-- Ba et al. (2016). Layer Normalization. [arXiv:1607.06450](https://arxiv.org/abs/1607.06450)
-- Zhang & Sennrich (2019). Root Mean Square Layer Normalization. NeurIPS 2019. [arXiv:1910.07467](https://arxiv.org/abs/1910.07467)
-- Nguyen & Salazar (2019). Transformers without Tears. IWSLT 2019. [arXiv:1910.05895](https://arxiv.org/abs/1910.05895)
-- Li et al. (2024). Mix-LN: Unleashing the Power of Deeper Layers by Combining Pre-LN and Post-LN. ICLR 2025. [arXiv:2412.13795](https://arxiv.org/abs/2412.13795)
+- [1] LeCun, Y., Bottou, L., Orr, G. B., & Muller, K.-R. (1998). Efficient BackProp. In *Neural Networks: Tricks of the Trade*. https://link.springer.com/chapter/10.1007/3-540-49430-8_2
+- [2] Ioffe, S., & Szegedy, C. (2015). Batch Normalization: Accelerating Deep Network Training by Reducing Internal Covariate Shift. [arXiv:1502.03167](https://arxiv.org/abs/1502.03167)
+- [3] Ba, J. L., Kiros, J. R., & Hinton, G. E. (2016). Layer Normalization. [arXiv:1607.06450](https://arxiv.org/abs/1607.06450)
+- [4] Vaswani, A., et al. (2017). Attention Is All You Need. NeurIPS 2017. [arXiv:1706.03762](https://arxiv.org/abs/1706.03762)
+- [5] Nguyen, T. Q., & Salazar, J. (2019). Transformers without Tears: Improving the Normalization of Self-Attention. IWSLT 2019. [arXiv:1910.05895](https://arxiv.org/abs/1910.05895)
+- [6] Zhang, B., & Sennrich, R. (2019). Root Mean Square Layer Normalization. NeurIPS 2019. [arXiv:1910.07467](https://arxiv.org/abs/1910.07467)
+- [7] Xiong, R., et al. (2020). On Layer Normalization in the Transformer Architecture. ICML 2020. [arXiv:2002.04745](https://arxiv.org/abs/2002.04745)
+- [8] Brown, T., et al. (2020). Language Models are Few-Shot Learners (GPT-3). NeurIPS 2020. [arXiv:2005.14165](https://arxiv.org/abs/2005.14165)
+- [9] Li, Y., et al. (2024). Mix-LN: Unleashing the Power of Deeper Layers by Combining Pre-LN and Post-LN. ICLR 2025. [arXiv:2412.13795](https://arxiv.org/abs/2412.13795)
 
 ---
 
