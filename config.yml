@@ -79,7 +79,7 @@ params:
     homeInfoParams:
         Title: "The No Generals Problem"
         Content: >
-            Some thoughts about distributed systems.
+            Some thoughts on distributed systems and AI.
 
     socialIcons:
         - name: github
